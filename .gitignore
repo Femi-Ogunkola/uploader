@@ -1,6 +1,7 @@
 #temp file
 *__pycache__*
 *.uploader-env*
+.DS_Store
 
 #project
 package-lock.json
