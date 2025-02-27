@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package videoUpload;
+
+// The message representing the metadata of the video.
+// message VideoMetadata {
+//   string title = 1;        // Title of the video
+//   string description = 2;  // Description of the video
+//   string tags = 3;         // Tags associated with the video
+//   string user_id = 4;      // User uploading the video
+//   string file_name = 5;    // The file name of the video
+//   string content_type = 6; // The content type of the video (e.g., "video/mp4")
+//   int64 file_size = 7;     // The size of the video file in bytes
+// }
+
+// The message representing a chunk of video data (binary content).
+message VideoChunk {
+  bytes data = 1; // A chunk of the video file data (a portion of the video)
+  int64 chunk_index = 2; // The index of this chunk (helps with reordering)
+  bool is_last_chunk = 3; // Indicates if this is the last chunk of the video
+}
+
+// Request to upload a video, including metadata and video data (streamed).
+// message UploadVideoRequest {
+//   VideoMetadata metadata = 1; // Metadata about the video
+// }
+
+// Response for the video upload.
+message UploadVideoResponse {
+  string status = 1;          // Status of the upload (e.g., "success", "failure")
+  string video_id = 2;        // A unique identifier for the uploaded video
+  string message = 3;         // Additional message (e.g., error message if any)
+}
+
+// Video upload service definition with streaming.
+service VideoUploadService {
+  // RPC method for streaming video data and uploading it.
+  rpc UploadVideo (stream VideoChunk) returns (UploadVideoResponse);
+}

@@ -1,0 +1,10 @@
+#temp file
+*__pycache__*
+*.uploader-env*
+
+#project
+package-lock.json
+client/generated*
+client/node_modules*
+*.mp4
+server/stubs/*
