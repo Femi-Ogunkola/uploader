@@ -4,7 +4,7 @@ const protoLoader = require("@grpc/proto-loader");
 const fs = require("fs");
 const multer = require("multer");
 
-const PROTO_PATH = "../protos/media.proto";
+const PROTO_PATH = "protos/media.proto";
 const packageDefinition = protoLoader.loadSync(PROTO_PATH);
 const proto = grpc.loadPackageDefinition(packageDefinition).videoUpload;
 

@@ -18,4 +18,4 @@ build-client:
 	@ npm cache clean --force && rm -rf node_modules package-lock.json && npm install
 
 start-client:
-	@ node upload.js
+	@ node client/upload.js
