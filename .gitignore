@@ -4,6 +4,7 @@
 .DS_Store
 
 #project
+.env
 package-lock.json
 client/generated*
 client/node_modules*

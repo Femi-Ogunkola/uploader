@@ -21,15 +21,16 @@ const grpcClient = new proto.VideoUploadService(
 // Multer setup for handling file uploads
 const upload = multer({ dest: "temp/" });
 
-app.post("/upload", upload.single("video"), (req, res) => {
+app.post("/upload", upload.single("videoFile"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
   }
+  const videoTitle = req.body.videoTitle; // Get the video title from the form
 
+  console.log(videoTitle);
   const filePath = req.file.path;
   const chunkSize = 64 * 1024; // 64 KB per chunk
   const totalChunks = Math.ceil(req.file.size / chunkSize);
-  let chunkIndex = 0;
 
   console.log(`📂 Uploading file: ${req.file.originalname}`);
   console.log(`📏 File size: ${req.file.size} bytes`);
@@ -44,13 +45,17 @@ app.post("/upload", upload.single("video"), (req, res) => {
     res.json({ message: "✅ Upload successful", response });
   });
 
+  let firstChunk = 0;
+  let isLastChunk = false;
+  stream.write({ data: Buffer.from(videoTitle), firstChunk, isLastChunk });
+
   const fileStream = fs.createReadStream(filePath, {
     highWaterMark: chunkSize
   });
 
-  let totalSent = 0;
+  let chunkIndex = 1;
   fileStream.on("data", chunk => {
-    const isLastChunk = chunkIndex === totalChunks - 1;
+    const isLastChunk = chunkIndex === totalChunks;
 
     console.log(
       `📤 Sending chunk ${chunkIndex +
@@ -58,11 +63,9 @@ app.post("/upload", upload.single("video"), (req, res) => {
     );
     console.log(`🔎 isLastChunk: ${isLastChunk}`);
 
-    totalSent++;
     stream.write({ data: chunk, chunkIndex, isLastChunk });
     // stream.resume(); // Ensure the stream is actively flowing
     chunkIndex++;
-    console.log(totalSent);
 
     if (isLastChunk) {
       // End the stream to notify the server that no more chunks will be sent

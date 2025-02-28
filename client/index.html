@@ -8,6 +8,9 @@
 <body>
   <h1>Upload Video</h1>
   <form id="uploadForm" enctype="multipart/form-data">
+    <label for="videoTitle">Video Title:</label>
+    <input type="text" id="videoTitle" name="videoTitle" required><br><br>
+    
     <input type="file" id="videoFile" name="video" accept="video/*" required />
     <button type="submit">Upload Video</button>
   </form>
@@ -16,7 +19,8 @@
     document.getElementById("uploadForm").addEventListener("submit", function(event) {
       event.preventDefault();
       const formData = new FormData();
-      formData.append("video", document.getElementById("videoFile").files[0]);
+      formData.append("videoTitle", document.getElementById("videoTitle").value);
+      formData.append("videoFile", document.getElementById("videoFile").files[0]);
 
       fetch("http://localhost:3000/upload", {
         method: "POST",
