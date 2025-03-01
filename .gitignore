@@ -9,5 +9,4 @@ package-lock.json
 client/generated*
 client/node_modules*
 *.mp4
-server/stubs/*
 temp*

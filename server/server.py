@@ -15,48 +15,48 @@ class VideoUploadService(media_pb2_grpc.VideoUploadServiceServicer):
     
     def UploadVideo(self, request_iterator, context):
         # Prepare the video upload (we'll save it with the metadata)
-        video_id = 'upload_test'
+        default_video_id = 'upload_test'
         video_data = b''
+        total_chunks = 0
         try:
             # Process the stream
             for chunk in request_iterator:
                 #  Process video chunk
                 print(f"Received chunk {chunk.chunk_index} (size: {len(chunk.data)} bytes, last_chunk {chunk.is_last_chunk})")
                 if chunk.chunk_index == 0:
-                    video_id = str(chunk.data, 'utf-8')
+                    video_meta = str(chunk.data, 'utf-8').split('-')
+                    video_id, total_chunks = video_meta
+                    total_chunks = int(total_chunks)
                 else:
+                    progress = int((chunk.chunk_index/total_chunks) * 100)
                     video_data += chunk.data  # Append video chunk to video_data
-                    if chunk.is_last_chunk:
-                        print(f"Final chunk received (chunk {chunk.chunk_index}), saving video to disk...")
-                        video_file_path = f"{self.upload_directory}/{video_id}.mp4"
-                        # os.makedirs(os.path.dirname(video_file_path), exist_ok=True)
+                    status=media_pb2.Status(
+                        status='GOOD',
+                        message='Uploading',
+                        progress=progress
+                    )
+                    yield media_pb2.UploadVideoResponse(
+                        status=status
+                    )
 
-                        # Save the video data to a file once the last chunk is received
-                        with open(video_file_path, 'wb') as video_file:
-                            video_file.write(video_data)
-
-                        print(f"Video saved to {video_file_path}")
-            
-            # Close the file after all chunks are written
-            if video_file:
-                video_file.close()
+                if chunk.is_last_chunk:
+                    print(f"Final chunk received (chunk {chunk.chunk_index}), saving video to disk...")
+                    video_file_path = f"{self.upload_directory}/{video_id}.mp4"
+                    with open(video_file_path, 'wb') as video_file:
+                        video_file.write(video_data)
+                    yield media_pb2.UploadVideoResponse(
+                        status="success",
+                        message="Video uploaded successfully",
+                        progress=100,
+                        )
             
             self.s3Client.upload_video_file(filename=f"{video_file_path}", shouldForceVideo=False)
-            
-            # Respond to the client with the video ID and status
-            return media_pb2.UploadVideoResponse(
-                status="success",
-                video_id=video_id,
-                message="Video uploaded successfully"
-            )
+
         except Exception as e:
-            # Handle errors in the video upload
-            if video_file:
-                video_file.close()
             return media_pb2.UploadVideoResponse(
                 status="failure",
-                video_id="",
-                message=f"An error occurred during upload: {str(e)}"
+                message=f"An error occurred during upload: {str(e)}",
+                progress=0,
             )
     
     def _generate_video_id(self):

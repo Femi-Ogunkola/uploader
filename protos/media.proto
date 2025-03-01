@@ -25,15 +25,18 @@ message VideoChunk {
 //   VideoMetadata metadata = 1; // Metadata about the video
 // }
 
+message Status{
+  string status = 1;          // Status of the upload (e.g., "success", "failure")
+  string message = 2;         // Additional message (e.g., error message if any)
+  int64 progress = 3;
+}
 // Response for the video upload.
 message UploadVideoResponse {
-  string status = 1;          // Status of the upload (e.g., "success", "failure")
-  string video_id = 2;        // A unique identifier for the uploaded video
-  string message = 3;         // Additional message (e.g., error message if any)
+  Status status = 1;
 }
 
 // Video upload service definition with streaming.
 service VideoUploadService {
   // RPC method for streaming video data and uploading it.
-  rpc UploadVideo (stream VideoChunk) returns (UploadVideoResponse);
+  rpc UploadVideo (stream VideoChunk) returns (stream UploadVideoResponse);
 }
