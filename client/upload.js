@@ -4,13 +4,13 @@ const protoLoader = require("@grpc/proto-loader");
 const fs = require("fs");
 const multer = require("multer");
 
-const PROTO_PATH = "protos/media.proto";
+const PROTO_PATH = "../protos/media.proto";
 const packageDefinition = protoLoader.loadSync(PROTO_PATH);
 const proto = grpc.loadPackageDefinition(packageDefinition).videoUpload;
+const port = 3000;
 
 const app = express();
 app.use(express.static(__dirname));
-const port = 3000;
 
 // gRPC Client
 const grpcClient = new proto.VideoUploadService(
@@ -19,6 +19,7 @@ const grpcClient = new proto.VideoUploadService(
 );
 
 // Multer setup for handling file uploads
+let uploadProgress = 0;
 const upload = multer({ dest: "temp/" });
 
 app.post("/upload", upload.single("videoFile"), (req, res) => {
@@ -26,28 +27,24 @@ app.post("/upload", upload.single("videoFile"), (req, res) => {
     return res.status(400).json({ error: "No file uploaded" });
   }
   const videoTitle = req.body.videoTitle; // Get the video title from the form
-
-  console.log(videoTitle);
   const filePath = req.file.path;
   const chunkSize = 64 * 1024; // 64 KB per chunk
   const totalChunks = Math.ceil(req.file.size / chunkSize);
-
-  console.log(`📂 Uploading file: ${req.file.originalname}`);
-  console.log(`📏 File size: ${req.file.size} bytes`);
-  console.log(`🔢 Total Chunks: ${totalChunks}`);
-
-  const stream = grpcClient.uploadVideo((err, response) => {
-    if (err) {
-      console.error("🚨 gRPC Upload Error:", err);
-      return res.status(500).json({ error: "gRPC Upload Failed" });
-    }
-    console.log("Response from gRPC server:", response);
-    res.json({ message: "✅ Upload successful", response });
-  });
-
   let firstChunk = 0;
   let isLastChunk = false;
-  stream.write({ data: Buffer.from(videoTitle), firstChunk, isLastChunk });
+
+  console.log(`Uploading file: ${req.file.originalname}`);
+  console.log(`File size: ${req.file.size} bytes`);
+  console.log(`VideoTitle${videoTitle}`);
+  console.log(`Total Chunks: ${totalChunks}`);
+
+  const stream = grpcClient.uploadVideo();
+
+  stream.write({
+    data: Buffer.from(`${videoTitle}-${totalChunks}`),
+    firstChunk,
+    isLastChunk
+  });
 
   const fileStream = fs.createReadStream(filePath, {
     highWaterMark: chunkSize
@@ -58,34 +55,49 @@ app.post("/upload", upload.single("videoFile"), (req, res) => {
     const isLastChunk = chunkIndex === totalChunks;
 
     console.log(
-      `📤 Sending chunk ${chunkIndex +
-        1}/${totalChunks} (Size: ${chunk.length} bytes)`
+      `Sending chunk ${chunkIndex}/${totalChunks} (Size: ${chunk.length} bytes)`
     );
-    console.log(`🔎 isLastChunk: ${isLastChunk}`);
-
     stream.write({ data: chunk, chunkIndex, isLastChunk });
-    // stream.resume(); // Ensure the stream is actively flowing
     chunkIndex++;
-
-    if (isLastChunk) {
-      // End the stream to notify the server that no more chunks will be sent
-      console.log("Last chunk sent, closing stream.");
-      stream.end(); // End the stream once the last chunk is sent
-    }
   });
 
   fileStream.on("end", () => {
-    console.log("✅ All chunks sent. Closing stream...");
-    stream.end();
+    console.log("All chunks sent. Closing stream...");
+    // stream.end();
   });
 
   fileStream.on("error", err => {
-    console.error("🚨 File streaming error:", err);
+    console.error("File streaming error:", err);
     res.status(500).json({ error: "File streaming error" });
   });
+
+  stream.on("data", response => {
+    if (response.status && response.status.progress) {
+      uploadProgress = response.status.progress.toNumber();
+      console.log(`📊 Updated progress: ${uploadProgress}%`);
+    } else {
+      console.warn("⚠️ Unexpected response structure:", response);
+      // uploadProgress = response.status.progress.toNumber();
+    }
+  });
+
+  stream.on("error", err => {
+    console.log(err);
+  });
+
+  stream.on("end", () => {
+    console.log("✅ Upload complete! Sending response...");
+    res.json({ message: "Upload complete!" });
+  });
+});
+
+app.get("/progress", (req, res) => {
+  console.log("Start polling");
+  res.json({ progress: uploadProgress });
+  console.log(uploadProgress);
 });
 
 // Start Express Server
 app.listen(port, () => {
-  console.log(`🚀 Server running at http://localhost:${port}`);
+  console.log(`Server running at http://localhost:${port}`);
 });

@@ -35,6 +35,7 @@ class S3Client:
             logging.info("Url retrieved")
             return url
         try:
+            print(filename, self.bucketName)
             self.s3client.upload_file(filename, self.bucketName, filename ,ExtraArgs={'ContentType': "video/mp4"})
             url = self.generate_url(filename=filename)
             logging.info("Upload Successful")

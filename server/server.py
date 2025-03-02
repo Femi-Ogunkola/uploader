@@ -41,22 +41,30 @@ class VideoUploadService(media_pb2_grpc.VideoUploadServiceServicer):
 
                 if chunk.is_last_chunk:
                     print(f"Final chunk received (chunk {chunk.chunk_index}), saving video to disk...")
-                    video_file_path = f"{self.upload_directory}/{video_id}.mp4"
+                    video_file_path = f"{video_id}.mp4"
                     with open(video_file_path, 'wb') as video_file:
                         video_file.write(video_data)
+                    print("HERE")
+                    status=media_pb2.Status(
+                        status='success',
+                        message='Uploading',
+                        progress=100
+                    )
                     yield media_pb2.UploadVideoResponse(
-                        status="success",
-                        message="Video uploaded successfully",
-                        progress=100,
-                        )
-            
-            self.s3Client.upload_video_file(filename=f"{video_file_path}", shouldForceVideo=False)
+                        status=status
+                    )
+                    print("Uploading to s3")
+                    self.s3Client.upload_video_file(filename=f"{video_id}.mp4", shouldForceVideo=False)
+                    print("done Uploading to s3")
 
         except Exception as e:
-            return media_pb2.UploadVideoResponse(
-                status="failure",
-                message=f"An error occurred during upload: {str(e)}",
-                progress=0,
+            status=media_pb2.Status(
+                status='failed',
+                message=str(e),
+                progress=0
+            )
+            yield media_pb2.UploadVideoResponse(
+                status=status,
             )
     
     def _generate_video_id(self):
