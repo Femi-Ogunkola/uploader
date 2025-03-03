@@ -63,7 +63,7 @@ app.post("/upload", upload.single("videoFile"), (req, res) => {
 
   fileStream.on("end", () => {
     console.log("All chunks sent. Closing stream...");
-    // stream.end();
+    stream.end();
   });
 
   fileStream.on("error", err => {
