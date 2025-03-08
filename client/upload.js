@@ -2,6 +2,8 @@ const express = require("express");
 const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
 const fs = require("fs");
+const path = require("path");
+
 const multer = require("multer");
 
 const PROTO_PATH = "../protos/media.proto";
@@ -10,7 +12,10 @@ const proto = grpc.loadPackageDefinition(packageDefinition).videoUpload;
 const port = 3000;
 
 const app = express();
+const HLS_DIR = path.join(__dirname, "hls");
+
 app.use(express.static(__dirname));
+app.use("/hls", express.static(HLS_DIR));
 
 // gRPC Client
 const grpcClient = new proto.VideoUploadService(
@@ -95,6 +100,38 @@ app.get("/progress", (req, res) => {
   console.log("Start polling");
   res.json({ progress: uploadProgress });
   console.log(uploadProgress);
+});
+
+app.get("/video/new", (req, res) => {
+  console.log("📡 Client requested video stream...");
+  res.setHeader("Content-Type", "video/mp4");
+  res.setHeader("Transfer-Encoding", "chunked");
+
+  const call = grpcClient.StreamVideo({ filename: "new_h264.mp4" });
+
+  // We need to track initialization segment separately
+  let initSegmentSent = false;
+
+  call.on("data", chunk => {
+    // Handle initialization segment specially if needed
+    if (chunk.chunkType === "init") {
+      console.log(`🔹 Sending initialization segment`);
+    } else {
+      console.log(`🔹 Sending media chunk ${chunk.chunkIndex}`);
+    }
+
+    res.write(chunk.data);
+  });
+
+  call.on("end", () => {
+    console.log("✅ Stream completed!");
+    res.end();
+  });
+
+  call.on("error", err => {
+    console.error("❌ gRPC error:", err);
+    res.status(500).send("Error streaming video");
+  });
 });
 
 // Start Express Server

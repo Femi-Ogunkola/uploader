@@ -1,6 +1,6 @@
 .PHONY: protos
 
-build-protos:
+server-protos:
 	@ python3 -m grpc_tools.protoc -I=protos --python_out=server/stubs --grpc_python_out=server/stubs --pyi_out=server/stubs $(shell find protos -name "*.proto")
 
 client-protos:

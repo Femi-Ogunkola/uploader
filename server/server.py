@@ -1,12 +1,19 @@
 import os
 import grpc
+import subprocess
 from concurrent import futures
-import os
+import ffmpeg
+import time
+
+
 from stubs import media_pb2
 from stubs import media_pb2_grpc
 from s3client import S3Client
 
 from dotenv import load_dotenv
+
+CHUNK_SIZE = 1024 * 1024
+INIT_SEGMENT_SIZE = 1024
 
 class VideoUploadService(media_pb2_grpc.VideoUploadServiceServicer):
     def __init__(self, s3Client: S3Client):
@@ -44,7 +51,6 @@ class VideoUploadService(media_pb2_grpc.VideoUploadServiceServicer):
                     video_file_path = f"{video_id}.mp4"
                     with open(video_file_path, 'wb') as video_file:
                         video_file.write(video_data)
-                    print("HERE")
                     status=media_pb2.Status(
                         status='success',
                         message='Uploading',
@@ -70,6 +76,98 @@ class VideoUploadService(media_pb2_grpc.VideoUploadServiceServicer):
     def _generate_video_id(self):
         # You could implement your own video ID generation logic here
         return str(os.urandom(8).hex())
+
+    def convert_to_fragmented_h264(self, input_video_path, output_video_path):
+        """Converts the video to fragmented H.264 format using FFmpeg."""
+        if os.path.exists(output_video_path):
+            print("✅ Fragmented H.264 video already exists. Skipping conversion.")
+            return output_video_path  # Already converted
+
+        # Add before the conversion to check input streams
+        probe = ffmpeg.probe(input_video_path)
+        audio_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'audio']
+        print(f"Found {len(audio_streams)} audio streams in input file")
+        print("⏳ Converting video to fragmented H.264...")
+        try:
+                # The key flags here are: -movflags frag_keyframe+empty_moov+default_base_moof
+            # These ensure the MP4 is fragmented and MSE-compatible
+            temp_output = output_video_path + ".temp.mp4"
+            
+            (
+                ffmpeg
+                .input(input_video_path)
+                .output(
+                    temp_output, 
+                    vcodec="libx264",
+                    acodec="aac",
+                    movflags="faststart",
+                    preset="fast",
+                    # Additional parameters for better web compatibility
+                    level="3.0",
+                    pix_fmt="yuv420p",
+                    # Audio parameters
+                    ar="44100",  # Sample rate
+                    ab="128k"    # Bitrate
+                )
+                .run(overwrite_output=True, quiet=False)
+            )
+            # Then, fragment the MP4 for MSE
+            (
+                ffmpeg
+                .input(temp_output)
+                .output(
+                    output_video_path,
+                    c="copy",  # Just copy the streams without re-encoding
+                    movflags="frag_keyframe+empty_moov+default_base_moof+separate_moof",
+                    # Use smaller fragments for better streaming
+                    frag_duration="500",  # 500ms fragments
+                )
+                .run(overwrite_output=True, quiet=False)
+            )
+        
+            # Clean up the temporary file
+            try:
+                os.remove(temp_output)
+            except:
+                print("⚠️ Failed to remove temporary file")
+                print("✅ Conversion completed.")
+            return output_video_path
+        except ffmpeg.Error as e:
+            print("❌ FFmpeg error:", e.stderr)
+            raise RuntimeError("FFmpeg conversion failed")
+
+    def StreamVideo(self, request, context):
+        """Streams the fragmented H.264 video in chunks over gRPC."""
+        video_path = self.convert_to_fragmented_h264()  # Ensure it's in fragmented H.264 format
+
+        try:
+            with open(video_path, "rb") as video_file:
+                # First, extract the init segment (moov box) from the beginning of the file
+                # The init segment contains codec information needed by MSE
+                init_data = video_file.read(INIT_SEGMENT_SIZE)  # Usually around 1KB, but can vary
+                
+                yield media_pb2.VideoChunk(
+                    data=init_data,
+                    chunk_index=0,
+                    chunk_type="init"  # Add this field to your protobuf definition
+                )
+                
+                chunk_index = 1
+                while True:
+                    chunk = video_file.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    yield media_pb2.VideoChunk(
+                        data=chunk, 
+                        chunk_index=chunk_index,
+                        chunk_type="media"  # Regular media segment
+                    )
+                    chunk_index += 1
+                    time.sleep(0.1)  # Simulate network delay
+        except Exception as e:
+            print(f"❌ Error streaming video: {e}")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Failed to stream video")
 
 def serve():
     load_dotenv('.env')

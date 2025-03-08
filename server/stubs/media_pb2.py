@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmedia.proto\x12\x0bvideoUpload\"F\n\nVideoChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\x13\n\x0b\x63hunk_index\x18\x02 \x01(\x03\x12\x15\n\ris_last_chunk\x18\x03 \x01(\x08\";\n\x06Status\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x10\n\x08progress\x18\x03 \x01(\x03\":\n\x13UploadVideoResponse\x12#\n\x06status\x18\x01 \x01(\x0b\x32\x13.videoUpload.Status2b\n\x12VideoUploadService\x12L\n\x0bUploadVideo\x12\x17.videoUpload.VideoChunk\x1a .videoUpload.UploadVideoResponse(\x01\x30\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmedia.proto\x12\x0bvideoUpload\"Z\n\nVideoChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\x13\n\x0b\x63hunk_index\x18\x02 \x01(\x03\x12\x15\n\ris_last_chunk\x18\x03 \x01(\x08\x12\x12\n\nchunk_type\x18\x04 \x01(\t\" \n\x0cVideoRequest\x12\x10\n\x08video_id\x18\x01 \x01(\t\";\n\x06Status\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x10\n\x08progress\x18\x03 \x01(\x03\":\n\x13UploadVideoResponse\x12#\n\x06status\x18\x01 \x01(\x0b\x32\x13.videoUpload.Status2\xa7\x01\n\x12VideoUploadService\x12L\n\x0bUploadVideo\x12\x17.videoUpload.VideoChunk\x1a .videoUpload.UploadVideoResponse(\x01\x30\x01\x12\x43\n\x0bStreamVideo\x12\x19.videoUpload.VideoRequest\x1a\x17.videoUpload.VideoChunk0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,11 +32,13 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'media_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_VIDEOCHUNK']._serialized_start=28
-  _globals['_VIDEOCHUNK']._serialized_end=98
-  _globals['_STATUS']._serialized_start=100
-  _globals['_STATUS']._serialized_end=159
-  _globals['_UPLOADVIDEORESPONSE']._serialized_start=161
-  _globals['_UPLOADVIDEORESPONSE']._serialized_end=219
-  _globals['_VIDEOUPLOADSERVICE']._serialized_start=221
-  _globals['_VIDEOUPLOADSERVICE']._serialized_end=319
+  _globals['_VIDEOCHUNK']._serialized_end=118
+  _globals['_VIDEOREQUEST']._serialized_start=120
+  _globals['_VIDEOREQUEST']._serialized_end=152
+  _globals['_STATUS']._serialized_start=154
+  _globals['_STATUS']._serialized_end=213
+  _globals['_UPLOADVIDEORESPONSE']._serialized_start=215
+  _globals['_UPLOADVIDEORESPONSE']._serialized_end=273
+  _globals['_VIDEOUPLOADSERVICE']._serialized_start=276
+  _globals['_VIDEOUPLOADSERVICE']._serialized_end=443
 # @@protoc_insertion_point(module_scope)

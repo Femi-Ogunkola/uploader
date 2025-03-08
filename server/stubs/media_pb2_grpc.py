@@ -40,6 +40,11 @@ class VideoUploadServiceStub(object):
                 request_serializer=media__pb2.VideoChunk.SerializeToString,
                 response_deserializer=media__pb2.UploadVideoResponse.FromString,
                 _registered_method=True)
+        self.StreamVideo = channel.unary_stream(
+                '/videoUpload.VideoUploadService/StreamVideo',
+                request_serializer=media__pb2.VideoRequest.SerializeToString,
+                response_deserializer=media__pb2.VideoChunk.FromString,
+                _registered_method=True)
 
 
 class VideoUploadServiceServicer(object):
@@ -53,6 +58,12 @@ class VideoUploadServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StreamVideo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_VideoUploadServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -60,6 +71,11 @@ def add_VideoUploadServiceServicer_to_server(servicer, server):
                     servicer.UploadVideo,
                     request_deserializer=media__pb2.VideoChunk.FromString,
                     response_serializer=media__pb2.UploadVideoResponse.SerializeToString,
+            ),
+            'StreamVideo': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamVideo,
+                    request_deserializer=media__pb2.VideoRequest.FromString,
+                    response_serializer=media__pb2.VideoChunk.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -90,6 +106,33 @@ class VideoUploadService(object):
             '/videoUpload.VideoUploadService/UploadVideo',
             media__pb2.VideoChunk.SerializeToString,
             media__pb2.UploadVideoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamVideo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/videoUpload.VideoUploadService/StreamVideo',
+            media__pb2.VideoRequest.SerializeToString,
+            media__pb2.VideoChunk.FromString,
             options,
             channel_credentials,
             insecure,

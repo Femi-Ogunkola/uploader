@@ -5,14 +5,22 @@ from typing import ClassVar as _ClassVar, Mapping as _Mapping, Optional as _Opti
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class VideoChunk(_message.Message):
-    __slots__ = ("data", "chunk_index", "is_last_chunk")
+    __slots__ = ("data", "chunk_index", "is_last_chunk", "chunk_type")
     DATA_FIELD_NUMBER: _ClassVar[int]
     CHUNK_INDEX_FIELD_NUMBER: _ClassVar[int]
     IS_LAST_CHUNK_FIELD_NUMBER: _ClassVar[int]
+    CHUNK_TYPE_FIELD_NUMBER: _ClassVar[int]
     data: bytes
     chunk_index: int
     is_last_chunk: bool
-    def __init__(self, data: _Optional[bytes] = ..., chunk_index: _Optional[int] = ..., is_last_chunk: bool = ...) -> None: ...
+    chunk_type: str
+    def __init__(self, data: _Optional[bytes] = ..., chunk_index: _Optional[int] = ..., is_last_chunk: bool = ..., chunk_type: _Optional[str] = ...) -> None: ...
+
+class VideoRequest(_message.Message):
+    __slots__ = ("video_id",)
+    VIDEO_ID_FIELD_NUMBER: _ClassVar[int]
+    video_id: str
+    def __init__(self, video_id: _Optional[str] = ...) -> None: ...
 
 class Status(_message.Message):
     __slots__ = ("status", "message", "progress")

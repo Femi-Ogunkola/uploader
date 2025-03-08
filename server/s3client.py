@@ -53,6 +53,4 @@ class S3Client:
             return False
 
     def generate_url(self, filename: str) -> str:
-        if "media.naemoapp.com" in self.bucketName:
-            return f"https://{self.bucketName}/{filename}"
         return f"https://{self.bucketName}.s3.amazonaws.com/{filename}"

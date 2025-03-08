@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
   <title>Video Upload</title>
   <style>
     #progressContainer {
@@ -12,6 +15,7 @@
       overflow: hidden;
       margin-top: 10px;
     }
+
     #progressBar {
       width: 0%;
       height: 20px;
@@ -23,6 +27,7 @@
     }
   </style>
 </head>
+
 <body>
   <h1>Upload Video</h1>
   <form id="uploadForm" enctype="multipart/form-data">
@@ -33,31 +38,34 @@
       <div id="progressBar">0%</div>
     </div>
 
-    <input type="file" id="videoFile" name="video" accept="video/*" required />
     <button type="submit">Upload Video</button>
   </form>
 
+  <video id="videoPlayer" width="640" height="360" controls>
+    Your browser does not support the video tag.
+  </video>
+
   <script>
-    document.getElementById("uploadForm").addEventListener("submit", function(event) {
+    document.getElementById("uploadForm").addEventListener("submit",function(event) {
       startProgressPolling();
       event.preventDefault();
       const formData = new FormData();
-      formData.append("videoTitle", document.getElementById("videoTitle").value);
-      formData.append("videoFile", document.getElementById("videoFile").files[0]);
+      formData.append("videoTitle",document.getElementById("videoTitle").value);
+      formData.append("videoFile",document.getElementById("videoFile").files[0]);
 
-      fetch("http://localhost:3000/upload", {
+      fetch("http://localhost:3000/upload",{
         method: "POST",
         body: formData
       })
-      .then(response => response.json())
-      .then(data => {
-        console.log(data);
+        .then(response => response.json())
+        .then(data => {
+          console.log(data);
 
-      })
-      .catch(error => {
-        console.error(error);
-        alert("Error uploading video");
-      });
+        })
+        .catch(error => {
+          console.error(error);
+          alert("Error uploading video");
+        });
     });
 
     function startProgressPolling() {
@@ -65,7 +73,7 @@
       const progressBar = document.getElementById("progressBar");
 
       const progressInterval = setInterval(() => {
-        fetch("http://localhost:3000/progress", {
+        fetch("http://localhost:3000/progress",{
           method: "GET"
         })
           .then(response => response.json())
@@ -76,10 +84,232 @@
             // Stop polling if upload is complete
           })
           .catch(error => {
-            console.error("Error fetching progress:", error);
+            console.error("Error fetching progress:",error);
           });
-      }, 10); // Poll every second
+      },10); // Poll every second
     }
+    let isLastChunk = false;
+    // Simplified MSE implementation with better debugging
+    const video = document.getElementById('videoPlayer');
+    const mediaSource = new MediaSource();
+    video.src = URL.createObjectURL(mediaSource);
+
+    // Comprehensive error logging
+    video.addEventListener("error",() => {
+      const err = video.error;
+      console.error("❌ Video error:",{
+        code: err.code,
+        message: err.message,
+        name: err.name
+      });
+    });
+
+    mediaSource.addEventListener("error",(e) => {
+      console.error("❌ MediaSource error:",e);
+    });
+
+    // Enhanced debugging events
+    video.addEventListener("playing",() => console.log("▶️ Video is now playing!"));
+    video.addEventListener("waiting",() => console.log("⏳ Video is waiting for more data..."));
+    video.addEventListener("stalled",() => console.log("⚠️ Video playback has stalled"));
+    video.addEventListener("canplay",() => console.log("✅ Video can start playing"));
+    video.addEventListener("canplaythrough",() => console.log("✅ Video can play through without buffering"));
+
+    mediaSource.addEventListener("sourceopen",async () => {
+      console.log("📡 MediaSource opened");
+
+      // Try with a simpler MIME type first
+      const mimeType = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+      console.log("MIME support check:",MediaSource.isTypeSupported(mimeType));
+
+      if(!MediaSource.isTypeSupported(mimeType)) {
+        console.error("❌ Codec not supported:",mimeType);
+        return;
+      }
+
+      const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+      let queue = [];
+      let isAppending = false;
+      let fetchCompleted = false;
+      let initSegmentReceived = false;
+
+      // Process the buffer queue
+      function processQueue() {
+        if(queue.length > 0 && !isAppending && mediaSource.readyState === "open") {
+          const chunk = queue.shift();
+          appendChunk(chunk);
+        }
+      }
+
+      // Log when MSE is ready to receive more data
+      sourceBuffer.addEventListener("updateend",() => {
+        console.log("✅ Buffer update complete, queue size:",queue.length);
+        isAppending = false;
+
+        // Try to process next chunk
+        processQueue();
+
+        // Check if we're done
+        if(fetchCompleted && queue.length === 0 && mediaSource.readyState === "open") {
+          try {
+            console.log("✅ No more chunks, closing stream");
+            mediaSource.endOfStream();
+
+            // Force play
+            const playPromise = video.play();
+            if(playPromise !== undefined) {
+              playPromise.catch((e) => {
+                console.warn("⚠️ Auto-play failed:",e);
+                // Add play button or UI element here
+              });
+            }
+          } catch(e) {
+            console.error("❌ Error ending stream:",e);
+          }
+        }
+      });
+
+      sourceBuffer.addEventListener("error",(e) => {
+        console.error("❌ SourceBuffer error:",e);
+      });
+
+      function appendChunk(chunk) {
+        if(!chunk || chunk.byteLength === 0) {
+          console.warn("⚠️ Empty chunk received");
+          return;
+        }
+
+        if(!sourceBuffer.updating && mediaSource.readyState === "open") {
+          try {
+            isAppending = true;
+
+            // Debug chunk contents
+            if(chunk.byteLength > 8) {
+              const dataView = new DataView(chunk.buffer,chunk.byteOffset,chunk.byteLength);
+              const boxType = String.fromCharCode(
+                dataView.getUint8(4),dataView.getUint8(5),
+                dataView.getUint8(6),dataView.getUint8(7)
+              );
+              console.log(`📥 Appending chunk of size: ${chunk.byteLength}, box type: ${boxType}`);
+            } else {
+              console.log(`📥 Appending small chunk of size: ${chunk.byteLength}`);
+            }
+
+            sourceBuffer.appendBuffer(chunk);
+          } catch(e) {
+            console.error("❌ Buffer append error:",e);
+
+            // If buffer is full, try removing older segments
+            if(e.name === 'QuotaExceededError') {
+              console.warn("⚠️ Buffer full, removing older segments");
+              const timeRanges = sourceBuffer.buffered;
+              if(timeRanges.length > 0 && video.currentTime > 0) {
+                // Keep last 10 seconds of video before current playback time
+                const startTime = Math.max(0,video.currentTime - 10);
+                try {
+                  sourceBuffer.remove(0,startTime);
+                  queue.unshift(chunk); // Put chunk back
+                } catch(removeError) {
+                  console.error("❌ Error removing buffer:",removeError);
+                }
+              }
+            } else {
+              // For other errors, log details and continue with next chunk
+              console.error("Chunk details:",{
+                size: chunk.byteLength,
+                isInit: !initSegmentReceived
+              });
+            }
+          }
+        } else {
+          queue.push(chunk);
+          console.log(`📦 Chunk queued (queue size: ${queue.length})`);
+        }
+      }
+
+      async function fetchVideoChunks() {
+        try {
+          console.log("📡 Fetching video stream...");
+          const response = await fetch("/video/new");
+
+          if(!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const reader = response.body.getReader();
+          let receivedBytes = 0;
+
+          // Force a timeout to help processing start
+          setTimeout(() => {
+            if(queue.length > 0 && !isAppending) {
+              console.log("⚠️ Force processing queue after timeout");
+              processQueue();
+            }
+          },2000);
+
+          async function readChunk() {
+            try {
+              const { done,value } = await reader.read();
+              if(done) {
+                console.log(`✅ Fetch complete! Total received: ${receivedBytes} bytes`);
+                fetchCompleted = true;
+
+                // Try processing one more time
+                if(!isAppending) {
+                  processQueue();
+                }
+
+                return;
+              }
+
+              receivedBytes += value.byteLength;
+              console.log(`📦 Received chunk of size: ${value.byteLength}, total: ${receivedBytes}`);
+
+              // Mark the first chunk as init segment
+              if(!initSegmentReceived) {
+                console.log("📦 Processing initialization segment");
+                initSegmentReceived = true;
+              }
+
+              appendChunk(value);
+              readChunk();
+            } catch(readError) {
+              console.error("❌ Error reading chunk:",readError);
+              fetchCompleted = true;
+            }
+          }
+
+          readChunk();
+        } catch(error) {
+          console.error("❌ Error fetching video:",error);
+          fetchCompleted = true;
+        }
+      }
+
+      fetchVideoChunks();
+    });
+
+    // Add click-to-play functionality
+    video.addEventListener("click",() => {
+      if(video.paused) {
+        video.play()
+          .then(() => console.log("▶️ Playback started manually"))
+          .catch((e) => console.warn("⚠️ Manual play failed:",e));
+      } else {
+        video.pause();
+        console.log("⏸️ Playback paused manually");
+      }
+    });
+
+    // Make sure volume is up
+    video.volume = 1.0;
+    video.muted = false;
+    // Add UI feedback for player state
+    video.addEventListener("loadstart",() => console.log("🔄 Video load started"));
+    video.addEventListener("loadedmetadata",() => console.log("📋 Video metadata loaded"));
+    video.addEventListener("loadeddata",() => console.log("📋 Video data loaded"));
+    video.addEventListener("progress",() => console.log("⏩ Video downloading..."));
   </script>
 </body>
+
 </html>
